@@ -3,7 +3,7 @@
     "name": "CATCHA!",
     "slug": "nekoui",
     "scheme": "nekoui",
-    "version": "0.1.0",
+    "version": "0.0.0",
     "orientation": "default",
     "userInterfaceStyle": "light",
     "backgroundColor": "#FFFFFF",
