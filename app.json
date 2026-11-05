@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "CATCHA!",
+    "slug": "nekoui",
+    "scheme": "nekoui",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FFFFFF",
+    "ios": {
+      "supportsTablet": true,
+      "requireFullScreen": false,
+      "bundleIdentifier": "dev.nekoui.app",
+      "appleTeamId": "36T82WWNT5"
+    },
+    "android": {
+      "package": "dev.nekoui.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-screen-orientation",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
