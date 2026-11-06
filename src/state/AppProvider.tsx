@@ -70,6 +70,7 @@ export function AppProvider({ services, children }: { services: AppServices; chi
     services.settingsStore
       .load()
       .then((loaded) => active && setSettings(loaded))
+      .catch((error) => console.warn('[app] could not load settings', error))
       .finally(() => active && setSettingsReady(true));
     return () => {
       active = false;
