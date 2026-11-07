@@ -4,13 +4,14 @@
  * 一覧の順番は、獲物を混ぜる順番（端数は先頭から足す）・描く順番・当たりを調べる順番になる。
  */
 import type { Behavior, PreyColor, PreyKind, Render } from '../types';
+import { birdKind } from './bird';
 import { mouseKind } from './mouse';
 import { stringKind } from './string';
 import { tailKind } from './tail';
 import { teaserKind } from './teaser';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- 状態の形は種類ごとに違うので、一覧ではまとめて扱う */
-export const PREY_KINDS: readonly PreyKind<any>[] = [stringKind, tailKind, teaserKind, mouseKind];
+export const PREY_KINDS: readonly PreyKind<any>[] = [stringKind, tailKind, teaserKind, mouseKind, birdKind];
 
 export const PREY_KIND_IDS: readonly string[] = PREY_KINDS.map((k) => k.id);
 

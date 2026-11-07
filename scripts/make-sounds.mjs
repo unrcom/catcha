@@ -6,6 +6,7 @@
  *   tail.wav    … しっぽが見えたときの、やわらかく丸い「ポワン」という音（猫じゃらしの「カサッ」と聞き分けやすいよう、雑音ではなく音程のある音）
  *   mouse-te.wav・mouse-ke.wav … ネズミの足音「テ」「ケ」。肉球のような、低めでやわらかい「ペタ」。足が地面につくたびに交互に鳴らし「テケテケ」にする
  *   startle.wav … 触られたときの、短い「チュッ」という高い音
+ *   bird-hop.wav・bird-flap.wav … 小鳥が跳ねるときの小さな「チッ」と、逃げるときの羽ばたき「パタタッ」（v0.1。FR2.6）
  * 使い方：node scripts/make-sounds.mjs
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -116,6 +117,36 @@ function boing(durationSec = 0.55) {
   });
 }
 
+/** 小鳥が跳ねるときの、小さく軽い「チッ」。高めの音程がすぐ下がって消える */
+function tick(durationSec = 0.04) {
+  const n = Math.floor(SAMPLE_RATE * durationSec);
+  let phase = 0;
+  return Array.from({ length: n }, (_, i) => {
+    const t = i / n;
+    const freq = 3200 - 1200 * t;
+    phase += (2 * Math.PI * freq) / SAMPLE_RATE;
+    const envelope = Math.min(1, t * 30) * (1 - t) ** 3;
+    return Math.sin(phase) * envelope * 0.3;
+  });
+}
+
+/** 小鳥が逃げるときの羽ばたき「パタタッ」。低めの成分を残した雑音の短い打ちを、少しずつ弱めて 4 回続ける */
+function flap(beats = 4, beatSec = 0.065) {
+  const rand = seeded(11);
+  const beatLength = Math.floor(SAMPLE_RATE * beatSec);
+  const n = beatLength * beats;
+  let smooth = 0;
+  const raw = Array.from({ length: n }, (_, i) => {
+    const beat = Math.floor(i / beatLength);
+    const t = (i % beatLength) / beatLength;
+    smooth += (rand() - smooth) * 0.35; // 高い成分を削って、羽が空気をたたく丸い音にする
+    const envelope = Math.min(1, t * 12) * (1 - t) ** 2 * (1 - beat * 0.18);
+    return smooth * envelope;
+  });
+  const peak = Math.max(...raw.map(Math.abs)) || 1;
+  return raw.map((v) => (v / peak) * 0.4);
+}
+
 try {
   mkdirSync(outDir, { recursive: true });
   const files = {
@@ -125,6 +156,8 @@ try {
     'mouse-te.wav': step(420, 300),
     'mouse-ke.wav': step(360, 260),
     'startle.wav': chirp(),
+    'bird-hop.wav': tick(),
+    'bird-flap.wav': flap(),
   };
   for (const [name, samples] of Object.entries(files)) writeFileSync(join(outDir, name), toWav(samples));
   console.log(`wrote ${Object.keys(files).join(', ')} to ${outDir}`);

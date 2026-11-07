@@ -1,3 +1,4 @@
+import type { BirdState } from '../../src/prey/behaviors/birdHop';
 import type { MouseAgentState } from '../../src/prey/behaviors/mouse';
 import type { ToyAgentState } from '../../src/prey/behaviors/strand';
 import { PREY_BEHAVIORS, PREY_COLORS, PREY_KIND_IDS } from '../../src/prey/kinds';
@@ -32,10 +33,14 @@ function run(world: World, field: typeof tablet, from: number, ms: number, rand:
   return now;
 }
 
-/** 全部の獲物を、しばらく出てこないように隠す（今の 4 種類だけ。ほかの種類はそのまま）。 */
+/** 全部の獲物を、しばらく出てこないように隠す（5 種類すべて。知らない種類があればテストを落とす）。 */
 function hideEverything(world: World, now: number) {
   for (const a of world.agents) {
-    if (a.kind === 'mouse') {
+    if (a.kind === 'bird') {
+      const b = a.state as BirdState;
+      b.mode = 'away';
+      b.returnAt = now + 1e9;
+    } else if (a.kind === 'mouse') {
       const m = mouseOf(a);
       m.active = false;
       m.nextAppearAt = now + 1e9;
@@ -47,6 +52,8 @@ function hideEverything(world: World, now: number) {
       const toy = toyOf(a);
       toy.travel!.visible = false;
       toy.travel!.enterAt = now + 1e9;
+    } else {
+      throw new Error(`hideEverything does not know how to hide "${a.kind}"`);
     }
   }
 }
