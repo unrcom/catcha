@@ -35,7 +35,7 @@ export function createWorld({ counts, field, isTablet, now, rand = Math.random }
     const scale = isTablet ? def.size.tablet : def.size.phone;
     return { id, kind, state: def.behavior.create({ field, isTablet, scale, now, rand, order }) };
   });
-  return { agents, ripples: [], emptySince: null, lastNow: now };
+  return { agents, ripples: [], emptySince: null, lastNow: now, pointer: null };
 }
 
 /** 画面に見えている獲物がいるか。 */
@@ -89,7 +89,9 @@ export function stepWorld(world: World, field: Field, now: number, rand: Rand = 
   world.lastNow = now;
   const cues: SoundCue[] = [];
   for (const a of world.agents) {
-    const cue = PREY_BEHAVIORS[a.kind].step(a.state, field, now, dt, rand);
+    const b = PREY_BEHAVIORS[a.kind];
+    if (b.watch) b.watch(a.state, world.pointer, now);
+    const cue = b.step(a.state, field, now, dt, rand);
     if (cue) cues.push({ kind: a.kind, cue });
   }
   // 何も見えない時間が長くならないよう、隠れているものを呼び戻す
@@ -105,6 +107,7 @@ export function stepWorld(world: World, field: Field, now: number, rand: Rand = 
  */
 export function touchWorld(world: World, p: Vec, field: Field, now: number, rand: Rand = Math.random): TouchResult {
   'worklet';
+  world.pointer = { x: p.x, y: p.y, at: now };
   const cues: SoundCue[] = [];
   let hitKind: string | null = null;
   for (const a of world.agents) {
@@ -120,4 +123,10 @@ export function touchWorld(world: World, p: Vec, field: Field, now: number, rand
   }
   if (hitKind !== null) world.ripples.push({ x: p.x, y: p.y, start: now, color: PREY_COLORS[hitKind] });
   return { hit: hitKind !== null, cues };
+}
+
+/** 指を動かした（FR なし。指の方を見る獲物のために、いちばん新しい指の位置だけを覚える）。 */
+export function pointWorld(world: World, p: Vec, now: number): void {
+  'worklet';
+  world.pointer = { x: p.x, y: p.y, at: now };
 }

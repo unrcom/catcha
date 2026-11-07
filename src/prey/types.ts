@@ -72,7 +72,15 @@ export type Behavior<S> = {
   recallRank(state: S, now: number): RecallRank | null;
   /** 呼び戻す */
   recall(state: S, field: Field, now: number): void;
+  /**
+   * 毎フレーム、step の前に、いちばん新しい指の位置を知らせる（指の方を見る獲物のため。なくてもよい）。
+   * まだ一度も触られていないときは pointer が null。
+   */
+  watch?(state: S, pointer: Pointer | null, now: number): void;
 };
+
+/** いちばん新しい指の位置と、その時刻（触った・動かした）。 */
+export type Pointer = { x: number; y: number; at: number };
 
 /** 描くときに渡すもの。筆（paint）はフレームごとに作り、獲物どうしで使い回す。 */
 export type DrawContext = {
@@ -130,6 +138,8 @@ export type World = {
   emptySince: number | null;
   /** 前のフレームの時刻 */
   lastNow: number;
+  /** いちばん新しい指の位置（指の方を見る獲物のため。まだ触られていなければ null） */
+  pointer: Pointer | null;
 };
 
 /** 触ったときの結果。hit は当たり範囲の中のものがあったか（「捕まえた」の音を鳴らす）。 */
