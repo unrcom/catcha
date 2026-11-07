@@ -10,6 +10,8 @@ import { StrokeTracker, type Point, type StrokeEnd } from '../domain/alphaGestur
 type Props = {
   onStrokeEnd: (stroke: StrokeEnd) => void;
   onTouchDown?: (point: Point) => void;
+  /** 指を動かした（なくてもよい） */
+  onTouchMove?: (point: Point) => void;
   onActiveCountChange?: (count: number) => void;
   hiddenFromAccessibility?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -29,6 +31,7 @@ function touchesOf(e: GestureResponderEvent): RawTouch[] {
 export function TouchSurface({
   onStrokeEnd,
   onTouchDown,
+  onTouchMove,
   onActiveCountChange,
   hiddenFromAccessibility = false,
   style,
@@ -49,7 +52,11 @@ export function TouchSurface({
   }
 
   function handleMove(e: GestureResponderEvent) {
-    for (const t of touchesOf(e)) tracker.move(String(t.identifier), point(t));
+    for (const t of touchesOf(e)) {
+      const p = point(t);
+      tracker.move(String(t.identifier), p);
+      onTouchMove?.(p);
+    }
   }
 
   function handleEnd(e: GestureResponderEvent) {

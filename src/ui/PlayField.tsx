@@ -20,7 +20,7 @@ import { FpsMeter } from '../prey/FpsMeter';
 import { PREY_KINDS } from '../prey/kinds';
 import { drawWorld } from '../prey/render/drawWorld';
 import type { Field, SoundCue, TouchResult, World } from '../prey/types';
-import { createWorld, stepWorld, touchWorld } from '../prey/world';
+import { createWorld, pointWorld, stepWorld, touchWorld } from '../prey/world';
 import { TABLET_MIN_SIDE, toyPalette } from './theme';
 import { TouchSurface } from './TouchSurface';
 import { useToySounds } from './useToySounds';
@@ -41,6 +41,11 @@ const FPS_METER_ON = process.env.EXPO_PUBLIC_FPS_METER === '1';
 
 /** Skia の上に重ねて描く表示（Rive など）を持つ種類。定義から作る（種類を足しても、ここは書き換えない） */
 const OVERLAY_KINDS = PREY_KINDS.filter((k) => k.Overlay);
+
+/** 指の方を見る獲物（動きの部品に watch がある種類）がいるか。いなければ、指を動かした位置は送らない */
+const WATCHES_POINTER = PREY_KINDS.some((k) => k.behavior.watch);
+/** 指を動かした位置を UI スレッドへ送る間隔（ミリ秒） */
+const MOVE_SEND_GAP_MS = 32;
 
 const EMPTY_PICTURE: SkPicture = createPicture(() => undefined);
 
@@ -116,6 +121,23 @@ export function PlayField({
     );
   }
 
+  // 指を動かした位置を覚える（指の方を見る獲物のため）。動かすたびに UI スレッドへ送らないよう、間を空ける
+  const lastMoveSent = useRef(0);
+  function handleTouchMove(p: Point) {
+    if (!WATCHES_POINTER || p.t - lastMoveSent.current < MOVE_SEND_GAP_MS) return;
+    lastMoveSent.current = p.t;
+    scheduleOnUI(
+      (x: number, y: number, t: number) => {
+        'worklet';
+        const w = world.value;
+        if (w) pointWorld(w, { x, y }, t);
+      },
+      p.x,
+      p.y,
+      p.t,
+    );
+  }
+
   const overlayHandlers = useMemo(
     () =>
       Object.fromEntries(
@@ -134,6 +156,7 @@ export function PlayField({
     <TouchSurface
       style={[StyleSheet.absoluteFill, { backgroundColor: palette.background }]}
       onTouchDown={handleTouchDown}
+      onTouchMove={handleTouchMove}
       onStrokeEnd={onStrokeEnd}
       onActiveCountChange={onActiveCountChange}
       hiddenFromAccessibility={hiddenFromAccessibility}
