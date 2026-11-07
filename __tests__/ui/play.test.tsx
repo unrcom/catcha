@@ -5,6 +5,8 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import React from 'react';
 
 import PlayScreen from '../../app/play';
+import { SETTINGS_STORAGE_KEY } from '../../src/data/settingsStore';
+import * as preyWorld from '../../src/prey/world';
 import { clearLatestResult, getLatestResult } from '../../src/state/resultStore';
 import { drawStroke, makeHarness, renderWithApp } from '../helpers/appHarness';
 import { mockRouter, resetRouter } from '../helpers/routerMock';
@@ -26,6 +28,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 describe('S3 遊び画面', () => {
@@ -36,6 +39,14 @@ describe('S3 遊び画面', () => {
     expect(screen.getByRole('header', { name: '遊び中' })).toHaveStyle({ opacity: 0 });
     // 見出し以外の文字はない
     expect(screen.queryAllByText(/.+/).map((el) => el.props.testID)).toEqual(['play-sr-heading']);
+  });
+
+  it('puts out as many prey as the settings say (FR5.1)', async () => {
+    await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ idleSeconds: 30, soundOn: true, background: 'dark', preyCount: 30 }));
+    const createWorld = jest.spyOn(preyWorld, 'createWorld');
+    await renderWithApp(<PlayScreen />, makeHarness());
+    expect(createWorld).toHaveBeenCalledWith(expect.objectContaining({ count: 30, isTablet: true }));
+    expect(createWorld.mock.results[0].value.agents).toHaveLength(30);
   });
 
   it('keeps the screen awake and locks the current orientation (NFR2)', async () => {

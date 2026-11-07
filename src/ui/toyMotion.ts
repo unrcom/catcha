@@ -7,6 +7,8 @@
  * - 猫じゃらし：持ち手は画面の下の外。軸の先のふさが「止まる・素早く飛ぶ・小刻みに揺れる」を繰り返す。
  *   触られると下へ引っ込んで消え、しばらくしてまた伸びて出てくる。
  * - ネズミ：ときどき現れ、ゆっくり歩く・止まる・斜めに走る・途中で向きを変える・たまに戻る。
+ *
+ * v0.1：獲物の世界（src/prey/world.ts）を UI スレッドで進めるため、関数に 'worklet' を付けた。計算と値は変えていない。
  */
 
 export type Vec = { x: number; y: number };
@@ -168,9 +170,18 @@ export const MOTION = {
 
 type Rand = () => number;
 
-const between = (rand: Rand, min: number, max: number) => min + (max - min) * rand();
+const between = (rand: Rand, min: number, max: number) => {
+  'worklet';
+  return min + (max - min) * rand();
+};
+
+function clamp(v: number, min: number, max: number): number {
+  'worklet';
+  return Math.min(max, Math.max(min, v));
+}
 
 function randomPoint(field: Field, rand: Rand): Vec {
+  'worklet';
   const m = MOTION.margin;
   return { x: between(rand, m, Math.max(m, field.width - m)), y: between(rand, m, Math.max(m, field.height - m)) };
 }
@@ -179,6 +190,7 @@ type Edge = 0 | 1 | 2 | 3; // 上・右・下・左
 
 /** 画面の端の外の点。 */
 function edgePoint(field: Field, edge: Edge, rand: Rand): Vec {
+  'worklet';
   const o = MOTION.offscreen;
   switch (edge) {
     case 0:
@@ -192,78 +204,18 @@ function edgePoint(field: Field, edge: Edge, rand: Rand): Vec {
   }
 }
 
-export function createToys(
-  field: Field,
-  options: { kinds: ToyKind[]; colors: string[]; isTablet: boolean; now: number },
-  rand: Rand = Math.random,
-): Toy[] {
-  const scale = options.isTablet ? 1 : MOTION.phoneToyScale; // スマートフォンは少し太く大きく
-  return options.kinds.map((kind, i) => {
-    const start = randomPoint(field, rand);
-    // 紐・しっぽは動作確認の依頼で太さも長さも2倍にした。猫じゃらしの軸はそのまま（先のふさだけ teaserPuffScale で大きくする）
-    const baseWidth = kind === 'tail' ? 32 : kind === 'teaser' ? 5 : 12;
-    const segLen = (kind === 'tail' ? 18 : 24) * scale;
-    const toy: Toy = {
-      kind,
-      color: options.colors[i % options.colors.length],
-      width: baseWidth * scale,
-      segLen,
-      points: Array.from({ length: MOTION.segments }, (_, k) => ({ x: start.x - k * segLen * 0.5, y: start.y })),
-      vel: { x: 0, y: 0 },
-      target: randomPoint(field, rand),
-      nextTargetAt: 0,
-      startledUntil: 0,
-      caughtUntil: 0,
-    };
-    if (kind === 'teaser') {
-      toy.teaser = {
-        anchorRatio: between(rand, 0.3, 0.7),
-        phase: 'pause',
-        phaseUntil: options.now + between(rand, ...MOTION.teaserPauseMs),
-        center: { ...start },
-        bend: { ...start },
-        clock: 0,
-      };
-      layTeaser(toy, field);
-    } else {
-      toy.travel = {
-        visible: false,
-        enterAt: options.now + between(rand, ...MOTION.travelFirstEnterMs) + i * 600,
-        exit: { ...start },
-        hasBeenInside: false,
-        quickEntry: false,
-        speed: 0,
-        speedTarget: 0,
-        speedChangeAt: 0,
-        wiggleFreq: between(rand, ...MOTION.travelWiggleFreq),
-        wiggleAmp: between(rand, ...MOTION.travelWiggleAmp),
-        clock: between(rand, 0, 10),
-      };
-      parkOffscreen(toy, field);
-    }
-    return toy;
-  });
-}
-
 /** 画面の中に見えているか。隠れているものは描かず、触っても当たらない。 */
 export function isToyVisible(toy: Toy): boolean {
+  'worklet';
   if (toy.travel) return toy.travel.visible;
   if (toy.teaser) return toy.teaser.phase !== 'hidden';
   return true;
 }
 
-/** 1つのものを dt 秒進める。猫じゃらしが素早く飛び始めたら true（動いた音の合図）。画面に入ってきたときの音は PlayField が鳴らす。 */
-export function stepToy(toy: Toy, field: Field, now: number, dt: number, rand: Rand = Math.random): boolean {
-  // 捕まえられている間は、その場で止まる
-  if (now < toy.caughtUntil) return false;
-  if (toy.teaser) return stepTeaser(toy, field, now, dt, rand);
-  if (toy.travel) return stepTraveler(toy, field, now, dt, rand);
-  return false;
-}
-
 // ---------------------------------------------------------------- 紐・しっぽ
 
 function parkOffscreen(toy: Toy, field: Field): void {
+  'worklet';
   const far = { x: -field.width - 1000, y: -field.height - 1000 };
   toy.points.forEach((p) => {
     p.x = far.x;
@@ -271,7 +223,14 @@ function parkOffscreen(toy: Toy, field: Field): void {
   });
 }
 
+/** 紐・しっぽの進む速さ。紐はしっぽより速い。 */
+export function travelSpeedOf(toy: Toy): number {
+  'worklet';
+  return toy.kind === 'string' ? MOTION.travelSpeed * MOTION.stringSpeedFactor : MOTION.travelSpeed;
+}
+
 function enter(toy: Toy, field: Field, now: number, rand: Rand): void {
+  'worklet';
   const t = toy.travel!;
   const from = Math.floor(rand() * 4) as Edge;
   // 出ていくのは、入ってきた端とは別の端（向かい側が多め）
@@ -307,16 +266,28 @@ function enter(toy: Toy, field: Field, now: number, rand: Rand): void {
   toy.vel = { x: 0, y: 0 };
 }
 
-/** 紐・しっぽの進む速さ。紐はしっぽより速い。 */
-export function travelSpeedOf(toy: Toy): number {
-  return toy.kind === 'string' ? MOTION.travelSpeed * MOTION.stringSpeedFactor : MOTION.travelSpeed;
+function followChain(toy: Toy): void {
+  'worklet';
+  for (let i = 1; i < toy.points.length; i += 1) {
+    const prev = toy.points[i - 1];
+    const p = toy.points[i];
+    const ax = p.x - prev.x;
+    const ay = p.y - prev.y;
+    const d = Math.hypot(ax, ay) || 1;
+    if (d > toy.segLen) {
+      p.x = prev.x + (ax / d) * toy.segLen;
+      p.y = prev.y + (ay / d) * toy.segLen;
+    }
+  }
 }
 
 function isOutside(p: Vec, field: Field, pad: number): boolean {
+  'worklet';
   return p.x < -pad || p.x > field.width + pad || p.y < -pad || p.y > field.height + pad;
 }
 
 function stepTraveler(toy: Toy, field: Field, now: number, dt: number, rand: Rand): boolean {
+  'worklet';
   const t = toy.travel!;
   if (!t.visible) {
     if (now < t.enterAt) return false;
@@ -369,29 +340,17 @@ function stepTraveler(toy: Toy, field: Field, now: number, dt: number, rand: Ran
   return false;
 }
 
-function followChain(toy: Toy): void {
-  for (let i = 1; i < toy.points.length; i += 1) {
-    const prev = toy.points[i - 1];
-    const p = toy.points[i];
-    const ax = p.x - prev.x;
-    const ay = p.y - prev.y;
-    const d = Math.hypot(ax, ay) || 1;
-    if (d > toy.segLen) {
-      p.x = prev.x + (ax / d) * toy.segLen;
-      p.y = prev.y + (ay / d) * toy.segLen;
-    }
-  }
-}
-
 // ---------------------------------------------------------------- 猫じゃらし
 
 /** 持ち手の位置（画面の下の端の少し外）。 */
 export function teaserAnchor(toy: Toy, field: Field): Vec {
+  'worklet';
   return { x: (toy.teaser?.anchorRatio ?? 0.5) * field.width, y: field.height + 30 };
 }
 
 /** ふさ（points[0]）から持ち手まで、たわんだ軸に沿って点を並べ直す。 */
 function layTeaser(toy: Toy, field: Field): void {
+  'worklet';
   const t = toy.teaser;
   if (!t) return;
   const tip = toy.points[0];
@@ -407,6 +366,7 @@ function layTeaser(toy: Toy, field: Field): void {
 }
 
 function moveToward(p: Vec, to: Vec, maxStep: number): boolean {
+  'worklet';
   const dx = to.x - p.x;
   const dy = to.y - p.y;
   const dist = Math.hypot(dx, dy);
@@ -422,6 +382,7 @@ function moveToward(p: Vec, to: Vec, maxStep: number): boolean {
 
 /** 猫じゃらしを dt 秒進める。飛び始めた・出てきたら true（動いた音の合図）。 */
 function stepTeaser(toy: Toy, field: Field, now: number, dt: number, rand: Rand): boolean {
+  'worklet';
   const t = toy.teaser!;
   const tip = toy.points[0];
   const anchor = teaserAnchor(toy, field);
@@ -496,15 +457,84 @@ function stepTeaser(toy: Toy, field: Field, now: number, dt: number, rand: Rand)
   return cue;
 }
 
+// ---------------------------------------------------------------- 作る・進める
+// （worklet は定義した時点で使う関数を取り込むので、使う関数より後ろに置く）
+
+export function createToys(
+  field: Field,
+  options: { kinds: ToyKind[]; colors: string[]; isTablet: boolean; now: number },
+  rand: Rand = Math.random,
+): Toy[] {
+  'worklet';
+  const scale = options.isTablet ? 1 : MOTION.phoneToyScale; // スマートフォンは少し太く大きく
+  return options.kinds.map((kind, i) => {
+    const start = randomPoint(field, rand);
+    // 紐・しっぽは動作確認の依頼で太さも長さも2倍にした。猫じゃらしの軸はそのまま（先のふさだけ teaserPuffScale で大きくする）
+    const baseWidth = kind === 'tail' ? 32 : kind === 'teaser' ? 5 : 12;
+    const segLen = (kind === 'tail' ? 18 : 24) * scale;
+    const toy: Toy = {
+      kind,
+      color: options.colors[i % options.colors.length],
+      width: baseWidth * scale,
+      segLen,
+      points: Array.from({ length: MOTION.segments }, (_, k) => ({ x: start.x - k * segLen * 0.5, y: start.y })),
+      vel: { x: 0, y: 0 },
+      target: randomPoint(field, rand),
+      nextTargetAt: 0,
+      startledUntil: 0,
+      caughtUntil: 0,
+    };
+    if (kind === 'teaser') {
+      toy.teaser = {
+        anchorRatio: between(rand, 0.3, 0.7),
+        phase: 'pause',
+        phaseUntil: options.now + between(rand, ...MOTION.teaserPauseMs),
+        center: { ...start },
+        bend: { ...start },
+        clock: 0,
+      };
+      layTeaser(toy, field);
+    } else {
+      toy.travel = {
+        visible: false,
+        enterAt: options.now + between(rand, ...MOTION.travelFirstEnterMs) + i * 600,
+        exit: { ...start },
+        hasBeenInside: false,
+        quickEntry: false,
+        speed: 0,
+        speedTarget: 0,
+        speedChangeAt: 0,
+        wiggleFreq: between(rand, ...MOTION.travelWiggleFreq),
+        wiggleAmp: between(rand, ...MOTION.travelWiggleAmp),
+        clock: between(rand, 0, 10),
+      };
+      parkOffscreen(toy, field);
+    }
+    return toy;
+  });
+}
+
+/** 1つのものを dt 秒進める。猫じゃらしが素早く飛び始めたら true（動いた音の合図）。画面に入ってきたときの音は PlayField が鳴らす。 */
+export function stepToy(toy: Toy, field: Field, now: number, dt: number, rand: Rand = Math.random): boolean {
+  'worklet';
+  // 捕まえられている間は、その場で止まる
+  if (now < toy.caughtUntil) return false;
+  if (toy.teaser) return stepTeaser(toy, field, now, dt, rand);
+  if (toy.travel) return stepTraveler(toy, field, now, dt, rand);
+  return false;
+}
+
 // ---------------------------------------------------------------- 共通
 
 /** 点から線（ものの体）までのいちばん近い距離。隠れているものは当たらない。 */
 export function distanceToToy(toy: Toy, p: Vec): number {
+  'worklet';
   if (!isToyVisible(toy)) return Number.POSITIVE_INFINITY;
   return Math.min(...toy.points.map((q) => Math.hypot(q.x - p.x, q.y - p.y)));
 }
 
 export function hitRadius(toy: Toy): number {
+  'worklet';
   // 猫じゃらしは、先のふさ（毛の長さ = 太さ × 6 × teaserPuffScale）のどこを触っても当たる
   if (toy.kind === 'teaser') return Math.max(36, toy.width * 6 * MOTION.teaserPuffScale);
   return Math.max(36, toy.width * 2);
@@ -516,6 +546,7 @@ export function hitRadius(toy: Toy): number {
  * - 紐・しっぽ：触られた所から離れる向きに、跳ねて素早く逃げる
  */
 export function startle(toy: Toy, from: Vec, field: Field, now: number): void {
+  'worklet';
   // 止まっている間にまた触られても、止まる時間は延ばさない（押さえ続けて動けなくならないように）
   if (now < toy.caughtUntil) return;
   // まず一瞬その場で止まり（捕まえた）、それから逃げる・引っ込む
@@ -543,6 +574,7 @@ export function startle(toy: Toy, from: Vec, field: Field, now: number): void {
 // ---------------------------------------------------------------- ネズミ
 
 export function createMouse(now: number, rand: Rand = Math.random, size: number = MOTION.mouseScale): Mouse {
+  'worklet';
   return {
     active: false,
     x: 0,
@@ -566,11 +598,13 @@ export function createMouse(now: number, rand: Rand = Math.random, size: number 
 
 /** ネズミの体が画面の中に収まる範囲（上下左右の余白）。 */
 function mouseBounds(field: Field, size: number) {
+  'worklet';
   const m = MOTION.margin * size;
   return { left: m, right: Math.max(m, field.width - m), top: m, bottom: Math.max(m, field.height - m) };
 }
 
 function setMouseVelocity(mouse: Mouse, speed: number, angle: number): void {
+  'worklet';
   mouse.vx = Math.cos(angle) * speed;
   mouse.vy = Math.sin(angle) * speed;
   mouse.angle = angle;
@@ -579,6 +613,7 @@ function setMouseVelocity(mouse: Mouse, speed: number, angle: number): void {
 
 /** 画面の中の好きな場所へ向かって走る（走り回る）。ときどき止まる。 */
 function chooseMouseMode(mouse: Mouse, field: Field, now: number, rand: Rand): void {
+  'worklet';
   if (mouse.hasBeenInside && rand() < MOTION.mouseStopChance) {
     mouse.mode = 'stop';
     mouse.modeUntil = now + between(rand, ...MOTION.mouseStopMs);
@@ -595,6 +630,7 @@ function chooseMouseMode(mouse: Mouse, field: Field, now: number, rand: Rand): v
 
 /** 走り回るのをやめて、近い方の左右の端から出ていく。 */
 function startLeaving(mouse: Mouse, field: Field, rand: Rand): void {
+  'worklet';
   mouse.mode = 'leave';
   mouse.modeUntil = Number.POSITIVE_INFINITY;
   const base = mouse.x < field.width / 2 ? Math.PI : 0;
@@ -603,6 +639,7 @@ function startLeaving(mouse: Mouse, field: Field, rand: Rand): void {
 
 /** ネズミを進める。現れたら 'appeared' を返す（音の合図）。 */
 export function stepMouse(mouse: Mouse, field: Field, now: number, dt: number, rand: Rand = Math.random): 'appeared' | null {
+  'worklet';
   // 捕まえられている間は、その場で止まる（足も動かない）
   if (mouse.active && now < mouse.caughtUntil) return null;
   if (!mouse.active) {
@@ -667,6 +704,7 @@ export function stepMouse(mouse: Mouse, field: Field, now: number, dt: number, r
  * 止まっている間は、体の向きを変えない（逃げる向きは、動き出したときに向く）。
  */
 export function startleMouse(mouse: Mouse, now: number, rand: Rand = Math.random): void {
+  'worklet';
   if (now < mouse.caughtUntil) return;
   const sign: 1 | -1 = mouse.vx > 0 ? 1 : mouse.vx < 0 ? -1 : mouse.dir;
   mouse.mode = 'flee';
@@ -681,21 +719,62 @@ export function startleMouse(mouse: Mouse, now: number, rand: Rand = Math.random
 
 /** ものの体のどこかが画面の中に見えているか。 */
 export function isToyOnScreen(toy: Toy, field: Field): boolean {
+  'worklet';
   if (!isToyVisible(toy)) return false;
   return toy.points.some((p) => !isOutside(p, field, 0));
 }
 
 export function isMouseOnScreen(mouse: Mouse, field: Field): boolean {
+  'worklet';
   const half = 30 * mouse.size;
   return mouse.active && mouse.x > -half && mouse.x < field.width + half;
 }
 
 export function isAnythingOnScreen(toys: Toy[], mouse: Mouse, field: Field): boolean {
+  'worklet';
   return isMouseOnScreen(mouse, field) || toys.some((toy) => isToyOnScreen(toy, field));
 }
 
 /** 画面に何も見えなくなった時刻。見えている間は null。 */
 export type EmptyWatch = { emptySince: number | null };
+
+// 呼び戻し方（keepSomethingOnScreen と、何匹でも扱う src/prey/world.ts の両方で使う）
+
+/** 隠れている猫じゃらしを、すぐ伸びて出てくるようにする。 */
+export function callBackTeaser(toy: Toy, now: number): void {
+  'worklet';
+  if (toy.teaser) toy.teaser.phaseUntil = now;
+}
+
+/** 隠れている紐・しっぽを、すぐ速めに入ってくるようにする。 */
+export function callBackTraveler(toy: Toy, now: number): void {
+  'worklet';
+  if (!toy.travel) return;
+  toy.travel.enterAt = now;
+  toy.travel.quickEntry = true;
+}
+
+/** いないネズミを、すぐ現れるようにする。 */
+export function callBackMouse(mouse: Mouse, now: number): void {
+  'worklet';
+  mouse.nextAppearAt = now;
+}
+
+/** 画面の外を通っている紐・しっぽを、画面の中心へ向け直す。 */
+export function turnTravelerToCenter(toy: Toy, field: Field, now: number): void {
+  'worklet';
+  const t = toy.travel;
+  if (!t) return;
+  const head = toy.points[0];
+  const cx = field.width / 2 - head.x;
+  const cy = field.height / 2 - head.y;
+  const d = Math.hypot(cx, cy) || 1;
+  t.exit = { x: head.x + (cx / d) * 4000, y: head.y + (cy / d) * 4000 };
+  t.hasBeenInside = false;
+  t.speed = Math.max(t.speed, 260);
+  t.speedTarget = t.speed;
+  t.speedChangeAt = now + 800;
+}
 
 /**
  * 画面に何も見えない状態が callBackAfterEmptyMs 続いたら、隠れているものを1つ呼び戻す。
@@ -708,6 +787,7 @@ export function keepSomethingOnScreen(
   now: number,
   watch: EmptyWatch,
 ): boolean {
+  'worklet';
   if (isAnythingOnScreen(toys, mouse, field)) {
     watch.emptySince = null;
     return false;
@@ -723,39 +803,25 @@ export function keepSomethingOnScreen(
 
   const teaser = toys.find((toy) => toy.teaser?.phase === 'hidden');
   if (teaser) {
-    teaser.teaser!.phaseUntil = now;
+    callBackTeaser(teaser, now);
     return true;
   }
   const hidden = toys
     .filter((toy) => toy.travel && !toy.travel.visible)
     .sort((a, b) => a.travel!.enterAt - b.travel!.enterAt)[0];
   if (hidden) {
-    hidden.travel!.enterAt = now;
-    hidden.travel!.quickEntry = true;
+    callBackTraveler(hidden, now);
     return true;
   }
   if (!mouse.active) {
-    mouse.nextAppearAt = now;
+    callBackMouse(mouse, now);
     return true;
   }
   // 画面の外を通っている紐・しっぽは、画面の中心へ向け直す
   const offscreen = toys.find((toy) => toy.travel?.visible);
   if (offscreen) {
-    const t = offscreen.travel!;
-    const head = offscreen.points[0];
-    const cx = field.width / 2 - head.x;
-    const cy = field.height / 2 - head.y;
-    const d = Math.hypot(cx, cy) || 1;
-    t.exit = { x: head.x + (cx / d) * 4000, y: head.y + (cy / d) * 4000 };
-    t.hasBeenInside = false;
-    t.speed = Math.max(t.speed, 260);
-    t.speedTarget = t.speed;
-    t.speedChangeAt = now + 800;
+    turnTravelerToCenter(offscreen, field, now);
     return true;
   }
   return false;
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, v));
 }

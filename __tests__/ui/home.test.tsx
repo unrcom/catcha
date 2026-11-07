@@ -44,10 +44,23 @@ describe('S2 ホーム', () => {
     await fireEvent.press(screen.getByTestId('settings-background-light'));
 
     await waitFor(async () =>
-      expect(await createSettingsStore().load()).toEqual({ idleSeconds: 120, soundOn: false, background: 'light' }),
+      expect(await createSettingsStore().load()).toEqual({ idleSeconds: 120, soundOn: false, background: 'light', preyCount: 5 }),
     );
     expect(screen.getByTestId('settings-idle-120')).toHaveProp('accessibilityState', { checked: true });
     expect(screen.getByText('オフ')).toBeOnTheScreen();
+  });
+
+  it('lets the owner choose 5 to 50 prey in steps of 5 and saves the choice (FR5.1, FR5.3)', async () => {
+    await renderWithApp(<HomeScreen />, makeHarness());
+    expect(screen.getByTestId('settings-prey-5')).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getAllByRole('radio', { name: /^獲物の数 / })).toHaveLength(10);
+    expect(screen.queryByTestId('settings-prey-55')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('settings-prey-30'));
+
+    await waitFor(async () => expect((await createSettingsStore().load()).preyCount).toBe(30));
+    expect(screen.getByTestId('settings-prey-30')).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId('settings-prey-5')).toHaveProp('accessibilityState', { checked: false });
   });
 
   it('shows the unsent-records banner and clears it after a successful retry (FR7.3, FR7.4)', async () => {

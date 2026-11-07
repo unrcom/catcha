@@ -1,5 +1,5 @@
 /**
- * 遊びの設定（interaction-spec.md の PlaySettings。FR2.6, FR4.2）。
+ * 遊びの設定（interaction-spec.md の PlaySettings。FR2.6, FR4.2。v0.1 で獲物の数 FR5.1 を足した）。
  * 変えた時点で保存し、次の遊びから使う。
  */
 import React from 'react';
@@ -7,6 +7,7 @@ import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import {
   IDLE_SECONDS_OPTIONS,
+  PREY_COUNT_OPTIONS,
   type Background,
   type IdleSeconds,
   type PlaySettings as Settings,
@@ -96,6 +97,14 @@ export function PlaySettings({ settings, onChange }: Props) {
         optionLabel={(v) => BACKGROUND_LABELS[v]}
         onSelect={(background) => onChange({ background })}
         testIDPrefix="settings-background"
+      />
+      <Segmented
+        label="獲物の数"
+        options={PREY_COUNT_OPTIONS}
+        value={settings.preyCount}
+        optionLabel={(v) => `${v}匹`}
+        onSelect={(preyCount) => onChange({ preyCount })}
+        testIDPrefix="settings-prey"
       />
     </View>
   );
