@@ -103,6 +103,8 @@ export type OverlayProps = {
 /** 獲物の種類の定義（データ）。FR1.2 */
 export type PreyKind<S = unknown> = {
   id: string;
+  /** 設定の画面に出す名前 */
+  label: string;
   behavior: Behavior<S>;
   render: Render<S>;
   /** 合図の名前 → 音 */

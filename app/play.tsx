@@ -151,7 +151,7 @@ export default function PlayScreen() {
       <PlayField
         background={settings.background}
         soundOn={settings.soundOn}
-        preyCount={settings.preyCount}
+        preyCounts={settings.preyCounts}
         onStrokeEnd={handleStroke}
         onActiveCountChange={(n) => {
           fingersDown.current = n;

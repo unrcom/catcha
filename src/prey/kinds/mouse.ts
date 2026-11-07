@@ -7,6 +7,7 @@ import type { PreyKind } from '../types';
 /* eslint-disable @typescript-eslint/no-require-imports */
 export const mouseKind: PreyKind<MouseAgentState> = {
   id: 'mouse',
+  label: 'ネズミ',
   behavior: mouseBehavior,
   render: drawMouse,
   sounds: {

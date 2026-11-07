@@ -6,6 +6,7 @@ import type { PreyKind } from '../types';
 
 export const tailKind: PreyKind<ToyAgentState> = {
   id: 'tail',
+  label: 'しっぽ',
   behavior: strandBehavior('tail'),
   render: drawStrand,
   sounds: {

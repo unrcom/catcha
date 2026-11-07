@@ -5,6 +5,7 @@ import { PREY_BEHAVIORS, PREY_COLORS, PREY_KIND_IDS } from '../../src/prey/kinds
 import type { Agent, World } from '../../src/prey/types';
 import { createWorld, isAnythingOnScreen, stepWorld, touchWorld } from '../../src/prey/world';
 import { MOTION, travelSpeedOf } from '../../src/ui/toyMotion';
+import { evenly } from '../helpers/preyCounts';
 
 const tablet = { width: 1024, height: 768 };
 const phone = { width: 390, height: 844 };
@@ -60,7 +61,7 @@ function hideEverything(world: World, now: number) {
 
 describe('獲物の世界 (FR1.1〜FR1.3, FR4.2〜FR4.5)', () => {
   it('creates the current four kinds with the current MOTION values, on a tablet and on a phone (FR1.2, FR1.3)', () => {
-    const w = createWorld({ count: 5, field: tablet, isTablet: true, now: 0, rand: seeded() });
+    const w = createWorld({ counts: evenly(5), field: tablet, isTablet: true, now: 0, rand: seeded() });
     expect(new Set(w.agents.map((a) => a.kind))).toEqual(new Set(PREY_KIND_IDS));
     const string = toyOf(ofKind(w, 'string')[0]);
     const tail = toyOf(ofKind(w, 'tail')[0]);
@@ -70,7 +71,7 @@ describe('獲物の世界 (FR1.1〜FR1.3, FR4.2〜FR4.5)', () => {
     expect(teaser.width).toBe(5);
     expect(mouseOf(ofKind(w, 'mouse')[0]).size).toBe(MOTION.mouseScale);
 
-    const p = createWorld({ count: 5, field: phone, isTablet: false, now: 0, rand: seeded() });
+    const p = createWorld({ counts: evenly(5), field: phone, isTablet: false, now: 0, rand: seeded() });
     expect(toyOf(ofKind(p, 'string')[0]).width).toBeCloseTo(12 * MOTION.phoneToyScale);
     expect(toyOf(ofKind(p, 'tail')[0]).segLen).toBeCloseTo(18 * MOTION.phoneToyScale);
     expect(mouseOf(ofKind(p, 'mouse')[0]).size).toBe(MOTION.phoneMouseScale);
@@ -78,7 +79,7 @@ describe('獲物の世界 (FR1.1〜FR1.3, FR4.2〜FR4.5)', () => {
 
   it.each([30, 50])('moves a world of %i prey, each with its own kind of behavior (FR1.1)', (count) => {
     const rand = seeded(count);
-    const w = createWorld({ count, field: tablet, isTablet: true, now: 0, rand });
+    const w = createWorld({ counts: evenly(count), field: tablet, isTablet: true, now: 0, rand });
     expect(w.agents).toHaveLength(count);
     const before = w.agents.map((a) => JSON.stringify(a.state));
     run(w, tablet, 0, 3_000, rand);
@@ -91,7 +92,7 @@ describe('獲物の世界 (FR1.1〜FR1.3, FR4.2〜FR4.5)', () => {
 
   it('stops a touched prey for 0.4 s, adds one ripple and reports a hit for the catch sound (FR4.2, FR4.3, FR4.4)', () => {
     const rand = () => 0.5;
-    const w = createWorld({ count: 5, field: tablet, isTablet: true, now: 0, rand });
+    const w = createWorld({ counts: evenly(5), field: tablet, isTablet: true, now: 0, rand });
     const teaserAgent = ofKind(w, 'teaser')[0];
     const teaser = toyOf(teaserAgent);
     const tip = { ...teaser.points[0] };
@@ -116,7 +117,7 @@ describe('獲物の世界 (FR1.1〜FR1.3, FR4.2〜FR4.5)', () => {
 
   it('does nothing when the touch is where no prey is (FR4.2)', () => {
     const rand = () => 0.5;
-    const w = createWorld({ count: 5, field: tablet, isTablet: true, now: 0, rand });
+    const w = createWorld({ counts: evenly(5), field: tablet, isTablet: true, now: 0, rand });
     const before = JSON.stringify(w.agents);
     const result = touchWorld(w, { x: 5, y: 5 }, tablet, 1_000, rand);
     expect(result).toEqual({ hit: false, cues: [] });
@@ -126,7 +127,7 @@ describe('獲物の世界 (FR1.1〜FR1.3, FR4.2〜FR4.5)', () => {
 
   it('does not lengthen the stop when a caught prey is touched again', () => {
     const rand = () => 0.5;
-    const w = createWorld({ count: 5, field: tablet, isTablet: true, now: 0, rand });
+    const w = createWorld({ counts: evenly(5), field: tablet, isTablet: true, now: 0, rand });
     const teaser = toyOf(ofKind(w, 'teaser')[0]);
     const tip = { ...teaser.points[0] };
     touchWorld(w, tip, tablet, 1_000, rand);
@@ -141,7 +142,7 @@ describe('獲物の世界 (FR1.1〜FR1.3, FR4.2〜FR4.5)', () => {
     [30, phone, false],
   ] as const)('calls a hidden prey back within 5 s when all %i prey are hidden (FR4.5)', (count, field, isTablet) => {
     const rand = seeded(count);
-    const w = createWorld({ count, field, isTablet, now: 0, rand });
+    const w = createWorld({ counts: evenly(count), field, isTablet, now: 0, rand });
     const start = run(w, field, 0, 1_000, rand);
     hideEverything(w, start);
     // 隠したあとのフレームで、画面にはもう何も見えていない
@@ -157,7 +158,7 @@ describe('獲物の世界 (FR1.1〜FR1.3, FR4.2〜FR4.5)', () => {
 
   it.each([5, 50])('never leaves the screen empty for more than 5 s while %i prey play for a minute (FR4.5)', (count) => {
     const rand = seeded(count + 1);
-    const w = createWorld({ count, field: tablet, isTablet: true, now: 0, rand });
+    const w = createWorld({ counts: evenly(count), field: tablet, isTablet: true, now: 0, rand });
     let emptySince: number | null = 0;
     let longest = 0;
     run(w, tablet, 0, 60_000, rand, (now) => {

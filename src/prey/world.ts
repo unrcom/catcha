@@ -1,6 +1,6 @@
 /**
  * 獲物の世界（FR1.1・FR4.2・FR4.3・FR4.5・FR5.2）。遊び画面のすべての獲物（エージェント）と波紋を 1 つの値にまとめる。
- * - createWorld：獲物の数・画面の大きさ・タブレットかどうかから作る（JS スレッド）
+ * - createWorld：種類ごとの数・画面の大きさ・タブレットかどうかから作る（JS スレッド）
  * - stepWorld：全部を 1 フレーム進め、鳴らす音の合図を返す（UI スレッド）
  * - touchWorld：触った所の当たりを調べ、「捕まえた」（0.4 秒止まる）・逃げる・波紋を起こす（UI スレッド）
  * - 何も見えない時間が 5 秒を超えないよう、隠れている獲物を呼び戻す（v0.0.0 の keepSomethingOnScreen と
@@ -11,7 +11,7 @@
  */
 import { MOTION } from '../ui/toyMotion';
 import { PREY_BEHAVIORS, PREY_COLORS, PREY_KINDS } from './kinds';
-import { lineUpPrey } from './mix';
+import { lineUpPrey, type PreyCounts } from './mix';
 import { RIPPLE_LIFE_MS } from './render/ripple';
 import type { Agent, Field, Rand, RecallRank, SoundCue, TouchResult, Vec, World } from './types';
 
@@ -19,16 +19,17 @@ import type { Agent, Field, Rand, RecallRank, SoundCue, TouchResult, Vec, World 
 const MAX_DT = 0.05;
 
 export type CreateWorldOptions = {
-  count: number;
+  /** 種類ごとの数（設定の値。FR5.2） */
+  counts: PreyCounts;
   field: Field;
   isTablet: boolean;
   now: number;
   rand?: Rand;
 };
 
-/** 獲物の世界を作る（JS スレッドで呼ぶ）。数は範囲の中に収め、種類を同じ数ずつ混ぜる。 */
-export function createWorld({ count, field, isTablet, now, rand = Math.random }: CreateWorldOptions): World {
-  const agents: Agent[] = lineUpPrey(count).map(({ kind, order }, id) => {
+/** 獲物の世界を作る（JS スレッドで呼ぶ）。種類ごとに決めた数だけ作る（範囲は設定を読むときに守る）。 */
+export function createWorld({ counts, field, isTablet, now, rand = Math.random }: CreateWorldOptions): World {
+  const agents: Agent[] = lineUpPrey(counts).map(({ kind, order }, id) => {
     const def = PREY_KINDS.find((k) => k.id === kind);
     if (!def) throw new Error(`[prey] unknown kind: ${kind}`);
     const scale = isTablet ? def.size.tablet : def.size.phone;

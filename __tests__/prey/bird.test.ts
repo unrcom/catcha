@@ -4,6 +4,7 @@ import { PREY_KIND_IDS } from '../../src/prey/kinds';
 import type { World } from '../../src/prey/types';
 import { createWorld, touchWorld } from '../../src/prey/world';
 import { MOTION } from '../../src/ui/toyMotion';
+import { evenly } from '../helpers/preyCounts';
 
 const tablet = { width: 1024, height: 768 };
 const phone = { width: 390, height: 844 };
@@ -36,8 +37,8 @@ describe('小鳥 (FR2.1〜FR2.8)', () => {
     expect(PREY_KIND_IDS).toContain('bird');
     expect(BIRD_MOTION).toMatchObject({ hopLength: 40, hopMs: 150, restMs: [300, 900], noticeRadius: 150, fleeSpeed: 900, edgeTurn: 40, returnMs: [2_000, 5_000] });
     expect(BIRD_SIZE.phone).toBeLessThan(BIRD_SIZE.tablet);
-    const p = createWorld({ count: 5, field: phone, isTablet: false, now: 0, rand: middle });
-    const t = createWorld({ count: 5, field: tablet, isTablet: true, now: 0, rand: middle });
+    const p = createWorld({ counts: evenly(5), field: phone, isTablet: false, now: 0, rand: middle });
+    const t = createWorld({ counts: evenly(5), field: tablet, isTablet: true, now: 0, rand: middle });
     const sizeOf = (w: World) => (w.agents.find((a) => a.kind === 'bird')!.state as BirdState).size;
     expect(sizeOf(p)).toBe(BIRD_SIZE.phone);
     expect(sizeOf(t)).toBe(BIRD_SIZE.tablet);
@@ -77,7 +78,7 @@ describe('小鳥 (FR2.1〜FR2.8)', () => {
   });
 
   it('is caught for 0.4 s when the touch hits it, then flees with a flap (FR2.2, FR4.2)', () => {
-    const w = createWorld({ count: 5, field: tablet, isTablet: true, now: 0, rand: middle });
+    const w = createWorld({ counts: evenly(5), field: tablet, isTablet: true, now: 0, rand: middle });
     const state = w.agents.find((a) => a.kind === 'bird')!.state as BirdState;
     Object.assign(state, restingBird({ x: 300, y: 300 }, 0, 1_000));
     const result = touchWorld(w, { x: 310, y: 300 }, tablet, 1_000, middle);

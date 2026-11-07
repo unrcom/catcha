@@ -7,6 +7,7 @@ import type { PreyKind } from '../types';
 
 export const teaserKind: PreyKind<ToyAgentState> = {
   id: 'teaser',
+  label: '猫じゃらし',
   behavior: teaserBehavior,
   render: drawTeaser,
   sounds: {

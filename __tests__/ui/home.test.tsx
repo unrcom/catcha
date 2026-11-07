@@ -44,23 +44,50 @@ describe('S2 ホーム', () => {
     await fireEvent.press(screen.getByTestId('settings-background-light'));
 
     await waitFor(async () =>
-      expect(await createSettingsStore().load()).toEqual({ idleSeconds: 120, soundOn: false, background: 'light', preyCount: 5 }),
+      expect(await createSettingsStore().load()).toEqual({ idleSeconds: 120, soundOn: false, background: 'light', preyCounts: { string: 1, tail: 1, teaser: 1, mouse: 1, bird: 1 } }),
     );
     expect(screen.getByTestId('settings-idle-120')).toHaveProp('accessibilityState', { checked: true });
     expect(screen.getByText('オフ')).toBeOnTheScreen();
   });
 
-  it('lets the owner choose 5 to 50 prey in steps of 5 and saves the choice (FR5.1, FR5.3)', async () => {
+  it('lets the owner choose the number of each kind from 0, with a total of 1 to 50, and saves it (FR5.1, FR5.3)', async () => {
     await renderWithApp(<HomeScreen />, makeHarness());
-    expect(screen.getByTestId('settings-prey-5')).toHaveProp('accessibilityState', { checked: true });
-    expect(screen.getAllByRole('radio', { name: /^獲物の数 / })).toHaveLength(10);
-    expect(screen.queryByTestId('settings-prey-55')).toBeNull();
+    expect(screen.getByTestId('settings-prey-total')).toHaveTextContent('獲物の数（合計 5匹、50匹まで）');
+    for (const label of ['紐', 'しっぽ', '猫じゃらし', 'ネズミ', '小鳥']) expect(screen.getByText(label)).toBeOnTheScreen();
+    expect(screen.getByTestId('settings-prey-bird-count')).toHaveTextContent('1匹');
 
-    await fireEvent.press(screen.getByTestId('settings-prey-30'));
+    await fireEvent.press(screen.getByTestId('settings-prey-bird-minus'));
+    expect(screen.getByTestId('settings-prey-bird-count')).toHaveTextContent('0匹');
+    // 0 匹からは減らせない
+    expect(screen.getByTestId('settings-prey-bird-minus')).toHaveProp('accessibilityState', { disabled: true });
+    expect(screen.getByTestId('settings-prey-bird-minus')).toHaveProp('accessibilityHint', '小鳥は0匹です');
+    await fireEvent.press(screen.getByTestId('settings-prey-mouse-plus'));
 
-    await waitFor(async () => expect((await createSettingsStore().load()).preyCount).toBe(30));
-    expect(screen.getByTestId('settings-prey-30')).toHaveProp('accessibilityState', { checked: true });
-    expect(screen.getByTestId('settings-prey-5')).toHaveProp('accessibilityState', { checked: false });
+    await waitFor(async () =>
+      expect((await createSettingsStore().load()).preyCounts).toEqual({ string: 1, tail: 1, teaser: 1, mouse: 2, bird: 0 }),
+    );
+    expect(screen.getByTestId('settings-prey-total')).toHaveTextContent('獲物の数（合計 5匹、50匹まで）');
+  });
+
+  it('chooses a test set at once, and cannot go above 50 in total (FR5.1, FR5.2)', async () => {
+    await renderWithApp(<HomeScreen />, makeHarness());
+    expect(screen.getByTestId('settings-prey-preset-v0')).toHaveProp('accessibilityState', { checked: false });
+
+    await fireEvent.press(screen.getByTestId('settings-prey-preset-v0'));
+    expect(screen.getByTestId('settings-prey-preset-v0')).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId('settings-prey-bird-count')).toHaveTextContent('0匹');
+    expect(screen.getByTestId('settings-prey-total')).toHaveTextContent(/合計 4匹/);
+
+    await fireEvent.press(screen.getByTestId('settings-prey-preset-each10'));
+    await waitFor(async () =>
+      expect((await createSettingsStore().load()).preyCounts).toEqual({ string: 10, tail: 10, teaser: 10, mouse: 10, bird: 10 }),
+    );
+    expect(screen.getByTestId('settings-prey-total')).toHaveTextContent(/合計 50匹/);
+    for (const kind of ['string', 'tail', 'teaser', 'mouse', 'bird']) {
+      expect(screen.getByTestId(`settings-prey-${kind}-plus`)).toHaveProp('accessibilityState', { disabled: true });
+      expect(screen.getByTestId(`settings-prey-${kind}-plus`)).toHaveProp('accessibilityHint', '合計は50匹までです');
+    }
+    expect(screen.getByTestId('settings-prey-preset-v0')).toHaveProp('accessibilityState', { checked: false });
   });
 
   it('shows the unsent-records banner and clears it after a successful retry (FR7.3, FR7.4)', async () => {

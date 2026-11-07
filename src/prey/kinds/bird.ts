@@ -35,6 +35,7 @@ export const BIRD_SIZE = { tablet: 1.6, phone: 1.2 };
 /* eslint-disable @typescript-eslint/no-require-imports */
 export const birdKind: PreyKind<BirdState> = {
   id: 'bird',
+  label: '小鳥',
   behavior: birdHopBehavior(BIRD_MOTION),
   render: drawBird,
   sounds: {

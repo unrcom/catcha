@@ -7,6 +7,7 @@ import { BIRD_RIVE_START_TIMEOUT_MS, createBirdRiveOverlay } from '../../src/pre
 import { BIRD_RIVE_SOURCE } from '../../src/prey/render/birdRiveAsset';
 import type { World } from '../../src/prey/types';
 import { createWorld } from '../../src/prey/world';
+import { evenly } from '../helpers/preyCounts';
 
 type RiveProps = { onPlay?: () => void; onError?: (e: { type: string; message: string }) => void; source?: unknown };
 
@@ -27,7 +28,7 @@ const FAKE_RIV = 42;
 
 /** 小鳥が 2 羽いる世界（10 匹 → 5 種類 × 2 匹） */
 function worldWithBirds(): SharedValue<World | null> {
-  const world = createWorld({ count: 10, field, isTablet: true, now: 0, rand: () => 0.5 });
+  const world = createWorld({ counts: evenly(10), field, isTablet: true, now: 0, rand: () => 0.5 });
   return { value: world } as unknown as SharedValue<World | null>;
 }
 

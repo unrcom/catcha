@@ -41,12 +41,14 @@ describe('S3 遊び画面', () => {
     expect(screen.queryAllByText(/.+/).map((el) => el.props.testID)).toEqual(['play-sr-heading']);
   });
 
-  it('puts out as many prey as the settings say (FR5.1)', async () => {
-    await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ idleSeconds: 30, soundOn: true, background: 'dark', preyCount: 30 }));
+  it('puts out as many prey of each kind as the settings say (FR5.1, FR5.2)', async () => {
+    const preyCounts = { string: 1, tail: 1, teaser: 1, mouse: 2, bird: 0 };
+    await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ idleSeconds: 30, soundOn: true, background: 'dark', preyCounts }));
     const createWorld = jest.spyOn(preyWorld, 'createWorld');
     await renderWithApp(<PlayScreen />, makeHarness());
-    expect(createWorld).toHaveBeenCalledWith(expect.objectContaining({ count: 30, isTablet: true }));
-    expect(createWorld.mock.results[0].value.agents).toHaveLength(30);
+    expect(createWorld).toHaveBeenLastCalledWith(expect.objectContaining({ counts: preyCounts, isTablet: true }));
+    const agents = createWorld.mock.results[createWorld.mock.results.length - 1].value.agents as { kind: string }[];
+    expect(agents.map((a) => a.kind)).toEqual(['string', 'tail', 'teaser', 'mouse', 'mouse']);
   });
 
   it('keeps the screen awake and locks the current orientation (NFR2)', async () => {

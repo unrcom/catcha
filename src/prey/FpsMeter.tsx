@@ -2,15 +2,19 @@
  * 開発用のコマ数の計測表示（NFR1）。EXPO_PUBLIC_FPS_METER=1 のときだけ遊び画面に出す（PlayField が決める）。
  * UI スレッドのコマの間隔を数え、1 秒ごとのコマ数と、30 秒の平均のコマ数を画面の隅に出す。
  * 30 秒の平均はログにも出す（実機で 30 匹・50 匹のそれぞれを 30 秒測り、平均 58 コマ以上なら合格）。
+ * iPhone の切り欠きや角の丸みで欠けないよう、端末の安全な範囲（safe area）の内側に置く。
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useContext, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 /** 平均を出す長さ */
 export const FPS_WINDOW_MS = 30_000;
 const SECOND_MS = 1_000;
+/** 安全な範囲の端からの間隔 */
+export const FPS_METER_MARGIN = 8;
 
 type Counter = { windowStart: number; windowFrames: number; secondStart: number; secondFrames: number; lastAverage: number };
 
@@ -21,6 +25,9 @@ export function framesPerSecond(frames: number, elapsedMs: number): number {
 }
 
 export function FpsMeter({ preyCount }: { preyCount: number }) {
+  // 安全な範囲の値がないとき（テストなど）は、画面の端から間隔だけあける
+  const insets = useContext(SafeAreaInsetsContext);
+  const position = { top: (insets?.top ?? 0) + FPS_METER_MARGIN, left: (insets?.left ?? 0) + FPS_METER_MARGIN };
   const [text, setText] = useState('-- fps');
   const counter = useSharedValue<Counter>({ windowStart: -1, windowFrames: 0, secondStart: -1, secondFrames: 0, lastAverage: -1 });
 
@@ -60,13 +67,13 @@ export function FpsMeter({ preyCount }: { preyCount: number }) {
   });
 
   return (
-    <View style={styles.box} pointerEvents="none" testID="fps-meter">
+    <View style={[styles.box, position]} pointerEvents="none" testID="fps-meter">
       <Text style={styles.text}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  box: { position: 'absolute', top: 8, left: 8, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: 'rgba(0, 0, 0, 0.6)', borderRadius: 4 },
+  box: { position: 'absolute', paddingHorizontal: 6, paddingVertical: 2, backgroundColor: 'rgba(0, 0, 0, 0.6)', borderRadius: 4 },
   text: { color: '#7CFC00', fontSize: 12, fontVariant: ['tabular-nums'] },
 });

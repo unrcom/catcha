@@ -1,6 +1,6 @@
 /**
  * 遊び場（interaction-spec.md の PlayField。FR2.1〜FR2.6。v0.1 で FR3.1・FR4.1・FR5.1 の作りに替えた）
- * - 獲物は一体ずつのエージェント（src/prey/world.ts）。獲物の数は設定から受け取り、種類を同じ数ずつ混ぜる
+ * - 獲物は一体ずつのエージェント（src/prey/world.ts）。種類ごとの数は設定から受け取る（FR5.2）
  * - 世界は reanimated の useFrameCallback で UI スレッドで進め、Skia の Picture をそのフレームの中で描き直す
  *   （毎フレームの React の再描画をしない）
  * - 触られた獲物は「捕まえた」で止まってから逃げる。何もない所に触っても何も起きない（当たり判定も UI スレッド）
@@ -15,7 +15,7 @@ import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 
 import type { Point, StrokeEnd } from '../domain/alphaGesture';
-import { DEFAULT_SETTINGS, type Background } from '../data/settingsStore';
+import { DEFAULT_SETTINGS, preyCountsKey, totalPrey, type Background, type PreyCounts } from '../data/settingsStore';
 import { FpsMeter } from '../prey/FpsMeter';
 import { PREY_KINDS } from '../prey/kinds';
 import { drawWorld } from '../prey/render/drawWorld';
@@ -28,8 +28,8 @@ import { useToySounds } from './useToySounds';
 type Props = {
   background: Background;
   soundOn: boolean;
-  /** 遊び画面に出す獲物の数（設定の値。FR5.1） */
-  preyCount?: number;
+  /** 遊び画面に出す獲物の種類ごとの数（設定の値。FR5.1） */
+  preyCounts?: PreyCounts;
   onStrokeEnd: (stroke: StrokeEnd) => void;
   onActiveCountChange?: (count: number) => void;
   /** 飼い主メニューを開いている間は、読み上げの対象から外す */
@@ -47,7 +47,7 @@ const EMPTY_PICTURE: SkPicture = createPicture(() => undefined);
 export function PlayField({
   background,
   soundOn,
-  preyCount = DEFAULT_SETTINGS.preyCount,
+  preyCounts = DEFAULT_SETTINGS.preyCounts,
   onStrokeEnd,
   onActiveCountChange,
   hiddenFromAccessibility = false,
@@ -72,12 +72,17 @@ export function PlayField({
     colors.value = toyPalette(background);
   }, [colors, background]);
 
-  // 獲物の世界は、遊び画面を開いたとき（と、獲物の数が変わったとき）に作る。画面の大きさは作った時点のもの
+  // 獲物の世界は、遊び画面を開いたとき（と、種類ごとの数が変わったとき）に作る。画面の大きさは作った時点のもの
+  // 数の中身で比べる（同じ数の新しい値が来ても作り直さない）
+  const countsKey = preyCountsKey(preyCounts);
+  const countsRef = useRef(preyCounts);
+  countsRef.current = preyCounts;
+  const preyTotal = totalPrey(preyCounts);
   const sizeAtStart = useRef({ width, height, isTablet });
   useEffect(() => {
     const { width: w, height: h, isTablet: tablet } = sizeAtStart.current;
-    world.value = createWorld({ count: preyCount, field: { width: w, height: h }, isTablet: tablet, now: Date.now() });
-  }, [world, preyCount]);
+    world.value = createWorld({ counts: countsRef.current, field: { width: w, height: h }, isTablet: tablet, now: Date.now() });
+  }, [world, countsKey]);
 
   // 音は JS 側で鳴らす（UI スレッドからは合図だけを渡す）
   const soundsRef = useRef(sounds);
@@ -148,7 +153,7 @@ export function PlayField({
           return <Overlay key={k.id} world={world} kind={k.id} onDrawingChange={overlayHandlers[k.id]} />;
         })}
       </View>
-      {FPS_METER_ON ? <FpsMeter preyCount={preyCount} /> : null}
+      {FPS_METER_ON ? <FpsMeter preyCount={preyTotal} /> : null}
     </TouchSurface>
   );
 }
