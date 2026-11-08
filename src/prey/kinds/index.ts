@@ -4,22 +4,16 @@
  * 一覧の順番は、獲物を混ぜる順番（端数は先頭から足す）・描く順番・当たりを調べる順番になる。
  */
 import type { Behavior, PreyColor, PreyKind, Render } from '../types';
-import { birdKind } from './bird';
 import { birdJointKind } from './birdJoint';
 import { mouseKind } from './mouse';
 import { stringKind } from './string';
 import { tailKind } from './tail';
 import { teaserKind } from './teaser';
 
-/** 開発用の切り替え。ビルドのときに EXPO_PUBLIC_BIRD_JOINTS=1 なら、小鳥を関節のある小鳥（試し）に入れ替える */
-const BIRD_JOINTS_ON = process.env.EXPO_PUBLIC_BIRD_JOINTS === '1';
-/** 開発用。EXPO_PUBLIC_BIRD_JOINTS=only なら、関節のある小鳥だけを出す（動きを見る・コマ数を測るため） */
-const BIRD_JOINTS_ONLY = process.env.EXPO_PUBLIC_BIRD_JOINTS === 'only';
-
 /* eslint-disable @typescript-eslint/no-explicit-any -- 状態の形は種類ごとに違うので、一覧ではまとめて扱う */
-export const PREY_KINDS: readonly PreyKind<any>[] = BIRD_JOINTS_ONLY
-  ? [birdJointKind]
-  : [stringKind, tailKind, teaserKind, mouseKind, BIRD_JOINTS_ON ? birdJointKind : birdKind];
+// 小鳥は関節と視線のある小鳥（範囲の変更、2026-11-07）。前の小鳥（kinds/bird.ts の birdKind）は一覧から外した。
+// 前の小鳥の定義は、関節のある小鳥が動きの数・大きさ・音・色を借りるので残している（Rive の表示もそこに付いたまま）
+export const PREY_KINDS: readonly PreyKind<any>[] = [stringKind, tailKind, teaserKind, mouseKind, birdJointKind];
 
 export const PREY_KIND_IDS: readonly string[] = PREY_KINDS.map((k) => k.id);
 

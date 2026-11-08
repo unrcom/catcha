@@ -1,5 +1,8 @@
 /**
- * 小鳥の定義（FR2.1〜FR2.9）。動きの数はここに置き、実機で調整する（FR2.8。最初の値は要件のとおり）。
+ * 小鳥の定義（FR2.1〜FR2.9）。
+ * 2026-11-07 から、この小鳥は種類の一覧（kinds/index.ts）に入れない（ID が関節つきの小鳥と同じ bird なので、入れるとぶつかる）。
+ * 動きの数・大きさ・音・色は、関節つきの小鳥（kinds/birdJoint.ts）が借りて使う。
+ * 動きの数はここに置き、実機で調整する（FR2.8。最初の値は要件のとおり）。
  * 見た目は Skia で描く。EXPO_PUBLIC_BIRD_RIVE=1 で Rive のファイルがあれば、Rive で描いた表示を重ねる（FR2.9）。
  */
 import { birdHopBehavior, type BirdMotion, type BirdState } from '../behaviors/birdHop';

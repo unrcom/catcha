@@ -45,7 +45,20 @@ const OVERLAY_KINDS = PREY_KINDS.filter((k) => k.Overlay);
 /** 指の方を見る獲物（動きの部品に watch がある種類）がいるか。いなければ、指を動かした位置は送らない */
 const WATCHES_POINTER = PREY_KINDS.some((k) => k.behavior.watch);
 /** 指を動かした位置を UI スレッドへ送る間隔（ミリ秒） */
-const MOVE_SEND_GAP_MS = 32;
+export const MOVE_SEND_GAP_MS = 32;
+
+/**
+ * 指を動かした位置を送るかどうかを決める関数を作る。指の方を見る獲物がいなければ送らない。
+ * いれば、前に送った時刻から gapMs たっていないときは送らない（送ったら、その時刻を覚える）。
+ */
+export function makeMoveGate(watches: boolean, gapMs: number = MOVE_SEND_GAP_MS): (t: number) => boolean {
+  let lastSent = Number.NEGATIVE_INFINITY;
+  return (t) => {
+    if (!watches || t - lastSent < gapMs) return false;
+    lastSent = t;
+    return true;
+  };
+}
 
 const EMPTY_PICTURE: SkPicture = createPicture(() => undefined);
 
@@ -127,10 +140,9 @@ export function PlayField({
   }
 
   // 指を動かした位置を覚える（指の方を見る獲物のため）。動かすたびに UI スレッドへ送らないよう、間を空ける
-  const lastMoveSent = useRef(0);
+  const shouldSendMove = useRef(makeMoveGate(WATCHES_POINTER)).current;
   function handleTouchMove(p: Point) {
-    if (!WATCHES_POINTER || p.t - lastMoveSent.current < MOVE_SEND_GAP_MS) return;
-    lastMoveSent.current = p.t;
+    if (!shouldSendMove(p.t)) return;
     scheduleOnUI(
       (x: number, y: number, t: number) => {
         'worklet';

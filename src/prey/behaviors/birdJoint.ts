@@ -1,5 +1,5 @@
 /**
- * 関節のある小鳥の動きの部品（試し。開発用の切り替え EXPO_PUBLIC_BIRD_JOINTS=1 のときだけ使う）。
+ * 関節のある小鳥の動きの部品（範囲の変更、2026-11-07 から v0.1 の小鳥）。
  * 歩く・逃げる・戻る（位置の動き）は、今の小鳥の部品（birdHop.ts）をそのまま中で使い、
  * その上で、関節の角度（首・頭の向き・羽の付け根・足・しっぽ・体の傾きとふくらみ）を毎フレーム決める。
  *
@@ -66,8 +66,6 @@ export type BirdJointState = BirdState & {
 
 /** 関節の動きの数（大きさ 1 のときの点・ミリ秒）。 */
 export const BIRD_JOINT_MOTION = {
-  /** タップされてから逃げるまで（今の小鳥の 0.4 秒より少し長くして、跳び上がる・ふくらむを見せる） */
-  tapMs: 650,
   /** タップされたときに跳び上がる高さ */
   tapJump: 34,
   /** タップされたときのふくらみの大きさ（1 + この値まで） */
@@ -185,7 +183,8 @@ function poseJoints(state: BirdJointState, now: number, dt: number, rand: Rand, 
 
   if (state.mode === 'caught') {
     // タップされた：ぴょんと跳び上がり、ふくらんでから縮む
-    const t = clampTo((now - state.tapStart) / J.tapMs, 0, 1);
+    // 止まる時間は、ほかの獲物と同じ「捕まえた」の 0.4 秒（FR2.2・FR4.2。前の小鳥の部品が caughtUntil を決める）
+    const t = clampTo((now - state.tapStart) / Math.max(1, state.caughtUntil - state.tapStart), 0, 1);
     target.lift = J.tapJump * bump(t / 0.7);
     let puff = 1;
     if (t < 0.3) puff = 1 + J.tapPuff * Math.sin((t / 0.3) * (Math.PI / 2));
@@ -328,7 +327,6 @@ export function birdJointBehavior(m: BirdMotion): Behavior<BirdJointState> {
       const cue = base.startle(state, from, field, now, rand);
       if (before !== 'caught' && state.mode === 'caught') {
         state.tapStart = now;
-        state.caughtUntil = now + J.tapMs;
         state.act = 'idle';
       }
       return cue;
