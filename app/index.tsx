@@ -10,6 +10,7 @@ import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useApp } from '../src/state/AppProvider';
+import { appVersionLabel } from '../src/ui/appVersion';
 import { ConfirmDialog } from '../src/ui/ConfirmDialog';
 import { Button, ErrorMessage, Heading } from '../src/ui/controls';
 import { PlaySettings } from '../src/ui/PlaySettings';
@@ -168,6 +169,11 @@ export default function HomeScreen() {
             {settingsError ? <ErrorMessage message={settingsError} testID="home-settings-error" /> : null}
           </View>
         </View>
+
+        {/* どのビルドが入っているかを、端末を見て分かるように（版はタグ、カッコの中はビルド番号） */}
+        <Text style={styles.version} testID="home-version">
+          {appVersionLabel()}
+        </Text>
       </ScrollView>
 
       <ConfirmDialog
@@ -210,4 +216,5 @@ const styles = StyleSheet.create({
   column: { gap: spacing.md },
   columnHalf: { flex: 1 },
   playButton: { minHeight: PLAY_BUTTON_HEIGHT },
+  version: { fontSize: fontSize.caption, color: colors.textMuted, textAlign: 'right' },
 });

@@ -35,6 +35,11 @@ describe('S2 ホーム', () => {
     expect(screen.queryByTestId('home-unsent-banner')).toBeNull();
   });
 
+  it('shows the app version in a corner, so a person can tell which build is installed', async () => {
+    await renderWithApp(<HomeScreen />, makeHarness());
+    expect(screen.getByTestId('home-version')).toHaveTextContent(/^v/);
+  });
+
   it('saves seconds, sound and background as soon as they change (FR4.2, FR2.6)', async () => {
     await renderWithApp(<HomeScreen />, makeHarness());
     expect(screen.getByTestId('settings-idle-30')).toHaveProp('accessibilityState', { checked: true });

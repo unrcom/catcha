@@ -11,10 +11,12 @@
       "supportsTablet": true,
       "requireFullScreen": false,
       "bundleIdentifier": "dev.nekoui.app",
+      "buildNumber": "2",
       "appleTeamId": "36T82WWNT5"
     },
     "android": {
-      "package": "dev.nekoui.app"
+      "package": "dev.nekoui.app",
+      "versionCode": 2
     },
     "plugins": [
       "expo-router",
